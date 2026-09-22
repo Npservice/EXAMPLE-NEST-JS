@@ -1,114 +1,280 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Example NestJS
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Starter backend NestJS yang udah lengkap sama Auth (JWT access + refresh token), RBAC berbasis permission, upload file (signed URL), response envelope standar, caching Redis, dan rate limiting — siap dipakai berulang buat project baru.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech stack
 
-## Description
+| Layer | Teknologi |
+|---|---|
+| Framework | [NestJS](https://nestjs.com) 12 |
+| Database | MySQL + [TypeORM](https://typeorm.io) |
+| Cache | Redis (`@nestjs/cache-manager` + `@keyv/redis`) |
+| Auth | JWT (`@nestjs/jwt` + `passport-jwt`), refresh token via httpOnly cookie |
+| Validasi | `class-validator` + `class-transformer` |
+| Test | Vitest |
+| Package manager | pnpm |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Arsitektur
 
-## Project setup
+### Prinsip
 
-```bash
-$ pnpm install
+- **Modular per domain**, bukan per layer — tiap fitur (`auth`, `users`, `files`) punya folder sendiri berisi controller/service/entity/dto-nya masing-masing.
+- **Guard-based security** — semua endpoint terkunci login secara default (global guard), kecuali ditandai `@Public()`.
+- **Permission-first authorization** — pengecekan akses utamanya pakai `@Permissions(...)`, bukan cuma role. `@Roles(...)` tetap tersedia sebagai lapisan tambahan (opsional, bisa dipasang bareng).
+- **Response envelope konsisten** — semua response API (sukses maupun error) punya bentuk yang sama, di-generate otomatis lewat interceptor + exception filter global, bukan ditulis manual di tiap endpoint.
+
+### Alur request (urutan guard/pipe global)
+
+```
+Request masuk
+   │
+   ▼
+ThrottlerGuard        → rate limiting (429 kalau kelebihan)
+   │
+   ▼
+JwtAuthGuard           → wajib login, kecuali @Public()
+   │                      (verifikasi JWT lewat passport-jwt, isi request.user)
+   ▼
+RolesGuard             → cek @Roles(...) kalau ada di endpoint
+   │
+   ▼
+PermissionsGuard        → cek @Permissions(...) kalau ada di endpoint
+   │
+   ▼
+ValidationPipe          → validasi body/query pakai DTO (class-validator)
+   │
+   ▼
+Controller → Service → Repository → Database
+   │
+   ▼
+ResponseInterceptor     → bungkus hasil sukses jadi { status, code, message, data }
+   (atau)
+HttpExceptionFilter     → bungkus error jadi { status: "error", code, message, data: null }
 ```
 
-## Compile and run the project
+### Struktur folder
 
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+```
+src/
+├── main.ts                        # bootstrap: CORS, cookie-parser, ValidationPipe
+├── app.module.ts                  # wiring semua module + global guard/interceptor/filter
+│
+├── common/                        # lintas-module, gak spesifik ke satu domain
+│   ├── decorators/
+│   │   ├── public.decorator.ts        # @Public() → skip JwtAuthGuard
+│   │   ├── roles.decorator.ts         # @Roles(...) → dicek RolesGuard
+│   │   ├── permissions.decorator.ts   # @Permissions(...) → dicek PermissionsGuard
+│   │   ├── response-message.decorator.ts # @ResponseMessage('...') → custom message di envelope
+│   │   └── current-user.decorator.ts  # @CurrentUser() → ambil user dari request
+│   ├── guards/
+│   │   ├── jwt-auth.guard.ts          # validasi JWT (global)
+│   │   ├── roles.guard.ts             # cek role (global, no-op kalau endpoint gak pasang @Roles)
+│   │   └── permissions.guard.ts       # cek permission (global, no-op kalau gak pasang @Permissions)
+│   ├── interceptors/
+│   │   └── response.interceptor.ts    # bungkus response sukses (global)
+│   ├── filters/
+│   │   └── http-exception.filter.ts   # bungkus response error (global)
+│   ├── types/
+│   │   └── authenticated-user.ts      # shape data user yang login (dari JWT payload)
+│   └── utils/
+│       ├── paging.util.ts             # helper format { items, meta } buat pagination
+│       └── signed-url.util.ts         # HMAC sign/validate buat signed URL file
+│
+├── config/
+│   ├── database.config.ts         # config TypeORM (dipakai NestJS app)
+│   └── redis.config.ts            # config cache Redis
+│
+├── database/
+│   ├── data-source.ts             # DataSource standalone (dipakai seeder, di luar konteks Nest)
+│   └── seeds/
+│       ├── permission.seed.ts     # seed daftar permission
+│       ├── role.seed.ts           # seed role + assign permission ke role
+│       ├── user.seed.ts           # seed 1 user admin default
+│       └── run-seed.ts            # orchestrator, jalanin ketiganya berurutan
+│
+└── modules/
+    ├── auth/                      # login/register/refresh/logout + entity Role & Permission
+    │   ├── entities/
+    │   │   ├── role.entity.ts
+    │   │   └── permission.entity.ts   # relasi many-to-many ke Role (tabel role_has_permission)
+    │   ├── strategies/jwt.strategy.ts # passport strategy, verifikasi token
+    │   ├── dto/
+    │   ├── auth.controller.ts     # /auth/register, /auth/login, /auth/refresh, /auth/logout
+    │   ├── auth.service.ts        # generate token pair, hash password, flatten permission
+    │   ├── roles.controller.ts    # /roles, /permissions, /roles/:id, PATCH /roles/:id/permissions
+    │   ├── roles.service.ts
+    │   └── auth.module.ts
+    │
+    ├── users/                     # entity User + relasi many-to-many ke Role (tabel user_roles)
+    │   ├── entities/user.entity.ts
+    │   ├── dto/
+    │   ├── users.repository.ts    # extends Repository<User>, query domain-specific
+    │   ├── users.service.ts
+    │   ├── users.controller.ts    # /users (CRUD + pagination + search)
+    │   └── users.module.ts
+    │
+    └── files/                     # upload file, signed URL, public/private access
+        ├── entities/file.entity.ts
+        ├── guards/signed-url.guard.ts  # validasi signed URL (dipakai khusus GET /files/signed/:id)
+        ├── files.service.ts
+        ├── files.controller.ts    # /files/store, /files/:id, /files/public/:id, dst
+        └── files.module.ts
 ```
 
-## Run tests
+### Skema database
+
+```
+users ───┐
+         │ M:N (tabel: user_roles)
+roles ───┤
+         │ M:N (tabel: role_has_permission)
+permissions
+
+files   (independen, gak ada relasi ke tabel lain)
+```
+
+Semua primary key pakai **UUID**. `users`, `roles`, `permissions`, dan `files` punya kolom `deletedAt` (soft delete) — data yang di-`DELETE` gak beneran hilang dari database, cuma ditandai, dan otomatis gak muncul lagi di query berikutnya.
+
+### Kenapa response-nya dibungkus semua?
+
+Setiap response sukses otomatis jadi:
+```json
+{ "status": "success", "code": 200, "message": "Success", "data": { ... } }
+```
+dan setiap error otomatis jadi:
+```json
+{ "status": "error", "code": 404, "message": "User #x not found", "data": null }
+```
+Kamu gak perlu nulis ini manual di tiap controller — cukup `throw new NotFoundException(...)` seperti biasa, atau tambahin `@ResponseMessage('Pesan custom')` kalau mau ganti message default-nya.
+
+Pengecualian: endpoint yang ngirim file mentah (`GET /files/:id`, dst) pakai `@Res() res: Response` langsung, jadi **gak** dibungkus — response-nya berupa file binary asli.
+
+## Prasyarat
+
+- Node.js 20+
+- pnpm
+- MySQL (lokal atau remote)
+- Redis (lokal atau remote)
+
+## Setup
+
+### 1. Install dependency
 
 ```bash
-# unit tests
-$ pnpm run test
+pnpm install
+```
 
-# e2e tests
-$ pnpm run test:e2e
+### 2. Siapkan environment variable
 
-# test coverage
-$ pnpm run test:cov
+Copy `.env.example` ke `.env`, lalu sesuaikan:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Keterangan |
+|---|---|
+| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` | Koneksi MySQL |
+| `JWT_SECRET` | Secret buat sign/verify JWT — **wajib diganti** sebelum production |
+| `JWT_ACCESS_EXPIRES_IN` | Masa berlaku access token (default `15m`) |
+| `JWT_REFRESH_EXPIRES_IN` | Masa berlaku refresh token (default `7d`) |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | Koneksi Redis |
+| `CACHE_TTL` | Default TTL cache dalam detik |
+| `THROTTLE_TTL`, `THROTTLE_LIMIT` | Rate limit: berapa request per berapa detik |
+| `APP_URL` | Base URL aplikasi (dipakai buat generate signed URL file) |
+| `FILE_TEMP_DIR`, `FILE_STORAGE_DIR` | Folder penyimpanan file upload (lokal disk) |
+| `SIGNED_URL_SECRET` | Secret buat HMAC signed URL file — **wajib diganti** sebelum production |
+
+> Database tabel dibuat **otomatis** lewat `synchronize: true` saat `NODE_ENV` bukan `production`. Gak perlu jalanin migration manual di development — cukup pastikan database (`DB_DATABASE`) udah dibuat duluan di MySQL-nya, tabelnya nanti otomatis.
+
+### 3. Jalankan aplikasi
+
+```bash
+pnpm start:dev     # development, auto-reload
+pnpm start         # tanpa watch
+pnpm start:prod    # production (jalanin dari dist/, perlu `pnpm build` dulu)
+```
+
+Server default jalan di `http://localhost:3000`.
+
+### 4. Seed data awal (role, permission, user admin)
+
+```bash
+pnpm seed
+```
+
+Ini bakal:
+- Bikin permission (`users:create`, `users:read`, `users:update`, `users:delete`, `roles:read`, `roles:update`)
+- Bikin role `admin` (semua permission), `editor` (read+update user), `user` (read user aja)
+- Bikin user admin default: **`admin@example.com` / `admin12345`**
+
+Aman dijalanin berkali-kali (idempotent — data yang udah ada bakal di-skip, bukan diduplikat).
+
+## Testing
+
+```bash
+pnpm test          # unit test
+pnpm test:watch    # watch mode
+pnpm test:cov      # dengan coverage
+pnpm test:e2e      # end-to-end test
+```
+
+## Ringkasan endpoint
+
+| Method | Endpoint | Auth | Keterangan |
+|---|---|---|---|
+| POST | `/auth/register` | Public | Daftar user baru |
+| POST | `/auth/login` | Public | Login, balikin access token + set cookie refresh token |
+| PATCH | `/auth/refresh` | Public (butuh cookie) | Refresh access token |
+| POST | `/auth/logout` | Public | Hapus cookie refresh token |
+| GET | `/roles` | `roles:read` | List semua role |
+| GET | `/permissions` | `roles:read` | List semua permission |
+| GET | `/roles/:id` | `roles:read` | Detail role + permission-nya |
+| PATCH | `/roles/:id/permissions` | `roles:update` | Ganti set permission suatu role |
+| POST | `/users` | `users:create` | Buat user (admin) |
+| GET | `/users?page=&size=&search=` | `users:read` | List user (pagination + search) |
+| GET | `/users/:id` | `users:read` | Detail user |
+| PATCH | `/users/:id` | `users:update` | Update user |
+| DELETE | `/users/:id` | `users:delete` | Soft-delete user |
+| POST | `/files/store` | login | Upload file (multipart, field `files`) |
+| GET | `/files/:id` | login | Ambil isi file (private) |
+| GET | `/files/:id/signed-url` | login | Generate signed URL sementara buat file |
+| GET | `/files/public/:id` | Public | Ambil isi file (status `public`) |
+| GET | `/files/public/:id/data` | Public | Generate signed URL buat file public |
+| GET | `/files/signed/:id` | Public + signature valid | Akses file lewat signed URL |
+
+## Cara pakai proteksi endpoint baru
+
+```ts
+@Controller('contoh')
+export class ContohController {
+  @Public()                              // skip login sepenuhnya
+  @Get('health')
+  health() { return 'ok'; }
+
+  @Permissions('contoh:read')            // wajib login + punya permission ini
+  @Get()
+  findAll() { ... }
+
+  @Roles('admin')                        // wajib login + role 'admin' (opsional, bisa gabung sama @Permissions)
+  @Permissions('contoh:delete')
+  @ResponseMessage('Berhasil dihapus')   // custom message di response envelope
+  @Delete(':id')
+  remove(@Param('id') id: string) { ... }
+}
+```
+
+Ambil data user yang lagi login:
+```ts
+@Get('me')
+me(@CurrentUser() user: AuthenticatedUser) {
+  return user; // { userId, email, roles, permissions }
+}
 ```
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Sebelum deploy ke production, pastikan:
+- `NODE_ENV=production` (biar `synchronize` mati — pakai migration TypeORM buat perubahan skema di production, bukan auto-sync)
+- `JWT_SECRET` dan `SIGNED_URL_SECRET` diganti dari nilai default
+- `secure: true` buat cookie refresh token otomatis aktif kalau `NODE_ENV=production` (lihat `auth.controller.ts`)

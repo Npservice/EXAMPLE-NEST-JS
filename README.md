@@ -221,27 +221,29 @@ pnpm test:e2e      # end-to-end test
 
 ## Ringkasan endpoint
 
+Semua endpoint di-prefix `/api/v1` (diset global lewat `app.setGlobalPrefix('api/v1')` di `main.ts`).
+
 | Method | Endpoint | Auth | Keterangan |
 |---|---|---|---|
-| POST | `/auth/register` | Public | Daftar user baru |
-| POST | `/auth/login` | Public | Login, balikin access token + set cookie refresh token |
-| PATCH | `/auth/refresh` | Public (butuh cookie) | Refresh access token |
-| POST | `/auth/logout` | Public | Hapus cookie refresh token |
-| GET | `/roles` | `roles:read` | List semua role |
-| GET | `/permissions` | `roles:read` | List semua permission |
-| GET | `/roles/:id` | `roles:read` | Detail role + permission-nya |
-| PATCH | `/roles/:id/permissions` | `roles:update` | Ganti set permission suatu role |
-| POST | `/users` | `users:create` | Buat user (admin) |
-| GET | `/users?page=&size=&search=` | `users:read` | List user (pagination + search) |
-| GET | `/users/:id` | `users:read` | Detail user |
-| PATCH | `/users/:id` | `users:update` | Update user |
-| DELETE | `/users/:id` | `users:delete` | Soft-delete user |
-| POST | `/files/store` | login | Upload file (multipart, field `files`) |
-| GET | `/files/:id` | login | Ambil isi file (private) |
-| GET | `/files/:id/signed-url` | login | Generate signed URL sementara buat file |
-| GET | `/files/public/:id` | Public | Ambil isi file (status `public`) |
-| GET | `/files/public/:id/data` | Public | Generate signed URL buat file public |
-| GET | `/files/signed/:id` | Public + signature valid | Akses file lewat signed URL |
+| POST | `/api/v1/auth/register` | Public | Daftar user baru |
+| POST | `/api/v1/auth/login` | Public | Login, balikin access token + set cookie refresh token |
+| PATCH | `/api/v1/auth/refresh` | Public (butuh cookie) | Refresh access token |
+| POST | `/api/v1/auth/logout` | Public | Hapus cookie refresh token |
+| GET | `/api/v1/roles` | `roles:read` | List semua role |
+| GET | `/api/v1/permissions` | `roles:read` | List semua permission |
+| GET | `/api/v1/roles/:id` | `roles:read` | Detail role + permission-nya |
+| PATCH | `/api/v1/roles/:id/permissions` | `roles:update` | Ganti set permission suatu role |
+| POST | `/api/v1/users` | `users:create` | Buat user (admin) |
+| GET | `/api/v1/users?page=&size=&search=` | `users:read` | List user (pagination + search) |
+| GET | `/api/v1/users/:id` | `users:read` | Detail user |
+| PATCH | `/api/v1/users/:id` | `users:update` | Update user |
+| DELETE | `/api/v1/users/:id` | `users:delete` | Soft-delete user |
+| POST | `/api/v1/files/store` | login | Upload file (multipart, field `files`) |
+| GET | `/api/v1/files/:id` | login | Ambil isi file (private) |
+| GET | `/api/v1/files/:id/signed-url` | login | Generate signed URL sementara buat file |
+| GET | `/api/v1/files/public/:id` | Public | Ambil isi file (status `public`) |
+| GET | `/api/v1/files/public/:id/data` | Public | Generate signed URL buat file public |
+| GET | `/api/v1/files/signed/:id` | Public + signature valid | Akses file lewat signed URL |
 
 ## Cara pakai proteksi endpoint baru
 

@@ -9,25 +9,28 @@ export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Permissions('roles:read')
+  @ResponseMessage('Berhasil ambil data role')
   @Get('roles')
   findAllRoles() {
     return this.rolesService.findAllRoles();
   }
 
   @Permissions('roles:read')
+  @ResponseMessage('Berhasil ambil data permission')
   @Get('permissions')
   findAllPermissions() {
     return this.rolesService.findAllPermissions();
   }
 
   @Permissions('roles:read')
+  @ResponseMessage('Berhasil ambil data role')
   @Get('roles/:id')
   findRole(@Param('id') id: string) {
     return this.rolesService.findRoleWithPermissions(id);
   }
 
   @Permissions('roles:update')
-  @ResponseMessage('Permission berhasil di update')
+  @ResponseMessage('Permission role berhasil diperbarui')
   @Patch('roles/:id/permissions')
   updateRolePermissions(
     @Param('id') id: string,

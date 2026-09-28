@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import {
   Column,
   DeleteDateColumn,
@@ -18,6 +19,7 @@ export class Role {
   @Column({ unique: true })
   name: string;
 
+  @Exclude()
   @ManyToMany(() => User, (user) => user.roles)
   users: Relation<User[]>;
 
@@ -31,6 +33,7 @@ export class Role {
   })
   permissions: Relation<Permission[]>;
 
+  @Exclude()
   @DeleteDateColumn()
   deletedAt: Date | null;
 }

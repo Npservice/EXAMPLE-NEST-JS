@@ -29,7 +29,7 @@ export class RolesService {
     });
 
     if (!role) {
-      throw new NotFoundException(`Role #${id} not found`);
+      throw new NotFoundException('Role tidak ditemukan');
     }
 
     return role;
@@ -38,10 +38,9 @@ export class RolesService {
   async updateRolePermissions(id: string, dto: UpdateRolePermissionsDto) {
     const role = await this.findRoleWithPermissions(id);
 
-
-    role.permissions = dto.permissionIds.length
+    role.permissions = dto.permission_ids.length
       ? await this.permissionsRepository.find({
-          where: { id: In(dto.permissionIds) },
+          where: { id: In(dto.permission_ids) },
         })
       : [];
     return this.rolesRepository.save(role);

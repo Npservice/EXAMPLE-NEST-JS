@@ -9,6 +9,7 @@ export interface JwtPayload {
   email: string;
   roles: string[];
   permissions: string[];
+  type: 'access' | 'refresh';
 }
 
 @Injectable()
@@ -22,7 +23,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): AuthenticatedUser {
-    if (!payload) {
+    // Refresh token tidak boleh dipakai sebagai access token.
+    if (payload?.type !== 'access') {
       throw new UnauthorizedException();
     }
 

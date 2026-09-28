@@ -1,112 +1,86 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/entities/user.entity.js';
-import { UsersRepository } from '../users/users.repository.js';
+import { UsersService } from '../users/users.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
+
+type ExpiresIn = `${number}${'s' | 'm' | 'h' | 'd'}`;
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersRepository: UsersRepository,
+    private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.usersRepository.findByEmail(dto.email);
-
-    if (existing) {
-      throw new ConflictException('Email already registered');
-    }
-
-    const password = await bcrypt.hash(dto.password, 10);
-    const user = this.usersRepository.create({ ...dto, password });
-    await this.usersRepository.save(user);
-
-    return this.buildTokenPair(user, [], []);
+    const user = await this.usersService.create(dto);
+    return this.buildTokenPair(user);
   }
 
   async login(dto: LoginDto) {
-    const user = await this.usersRepository.findByEmailWithPassword(
-      dto.email,
-    );
-
+    const user = await this.usersService.findByEmailWithPassword(dto.email);
     const passwordMatches = user
       ? await bcrypt.compare(dto.password, user.password)
       : false;
 
     if (!user || !passwordMatches) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Email atau password salah');
     }
 
-    const { roles, permissions } = this.flattenRolePermissions(user);
-    return this.buildTokenPair(user, roles, permissions);
+    return this.buildTokenPair(user);
   }
 
   async refreshToken(token: string) {
-    let payload: { sub: string };
+    const payload = await this.jwtService
+      .verifyAsync<{ sub: string; type: string }>(token)
+      .catch(() => null);
 
-    try {
-      payload = await this.jwtService.verifyAsync(token);
-    } catch {
-      throw new UnauthorizedException('Refresh token not valid');
+    // Access token tidak boleh dipakai untuk refresh.
+    if (payload?.type !== 'refresh') {
+      throw new UnauthorizedException('Refresh token tidak valid');
     }
 
-    const user = await this.usersRepository.findOneWithRelations(
-      payload.sub,
-    );
+    const user = await this.usersService.findOne(payload.sub).catch(() => null);
 
     if (!user) {
-      throw new UnauthorizedException('Refresh token not valid');
+      throw new UnauthorizedException('Refresh token tidak valid');
     }
 
-    const { roles, permissions } = this.flattenRolePermissions(user);
-    return this.buildTokenPair(user, roles, permissions);
+    return this.buildTokenPair(user);
   }
 
-  private flattenRolePermissions(user: User) {
+  private async buildTokenPair(user: User) {
     const roles = user.roles.map((role) => role.name);
     const permissions = [
       ...new Set(
         user.roles.flatMap((role) => role.permissions.map((p) => p.name)),
       ),
     ];
-    return { roles, permissions };
-  }
-
-  private async buildTokenPair(
-    user: User,
-    roles: string[],
-    permissions: string[],
-  ) {
-    const accessPayload = {
-      sub: user.id,
-      email: user.email,
-      roles,
-      permissions,
-    };
-    const refreshPayload = { sub: user.id };
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(accessPayload, {
-        expiresIn: this.configService.get(
-          'JWT_ACCESS_EXPIRES_IN',
-          '15m',
-        ) as `${number}${'s' | 'm' | 'h' | 'd'}`,
-      }),
-      this.jwtService.signAsync(refreshPayload, {
-        expiresIn: this.configService.get(
-          'JWT_REFRESH_EXPIRES_IN',
-          '7d',
-        ) as `${number}${'s' | 'm' | 'h' | 'd'}`,
-      }),
+      this.jwtService.signAsync(
+        { sub: user.id, email: user.email, roles, permissions, type: 'access' },
+        {
+          expiresIn: this.configService.get<ExpiresIn>(
+            'JWT_ACCESS_EXPIRES_IN',
+            '15m',
+          ),
+        },
+      ),
+      this.jwtService.signAsync(
+        { sub: user.id, type: 'refresh' },
+        {
+          expiresIn: this.configService.get<ExpiresIn>(
+            'JWT_REFRESH_EXPIRES_IN',
+            '7d',
+          ),
+        },
+      ),
     ]);
 
     return {

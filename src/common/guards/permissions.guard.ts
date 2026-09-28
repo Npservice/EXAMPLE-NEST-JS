@@ -32,7 +32,7 @@ export class PermissionsGuard implements CanActivate {
     );
 
     if (!hasPermission) {
-      throw new ForbiddenException('Insufficient permissions');
+      throw new ForbiddenException('Anda tidak punya akses');
     }
 
     return true;

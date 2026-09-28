@@ -1,4 +1,8 @@
-import { type ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  type ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
@@ -20,5 +24,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
 
     return super.canActivate(context);
+  }
+
+  override handleRequest<TUser>(err: unknown, user: TUser): TUser {
+    if (err || !user) {
+      throw new UnauthorizedException('Token tidak valid atau sudah kedaluwarsa');
+    }
+    return user;
   }
 }

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
-import { validateSignedUrl } from '../../../common/utils/signed-url.util.js';
+import { validateSignedUrl } from '../utils/signed-url.util.js';
 
 @Injectable()
 export class SignedUrlGuard implements CanActivate {
@@ -21,7 +21,7 @@ export class SignedUrlGuard implements CanActivate {
     const secret = this.configService.get('SIGNED_URL_SECRET', '');
 
     if (!secret || !validateSignedUrl(fullUrl, secret)) {
-      throw new ForbiddenException('Invalid or expired URL');
+      throw new ForbiddenException('URL tidak valid atau kedaluwarsa');
     }
 
     return true;

@@ -9,10 +9,10 @@ import {
 import type { Request, Response } from 'express';
 
 interface ErrorResponse {
-  status: 'error';
+  status: 'FAILED';
   code: number;
   message: string;
-  data: null;
+  data: unknown;
 }
 
 @Catch()
@@ -28,7 +28,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const code = isHttpException
       ? exception.getStatus()
       : HttpStatus.INTERNAL_SERVER_ERROR;
-    const message = isHttpException
+    let message = isHttpException
       ? this.extractMessage(exception)
       : 'Internal server error';
 
@@ -40,7 +40,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
       );
     }
 
-    const body: ErrorResponse = { status: 'error', code, message, data: null };
+    // Route tidak ada: router Nest melempar "Cannot GET /...".
+    if (code === 404 && message.startsWith('Cannot ')) {
+      message = `Endpoint ${request.method} ${request.originalUrl} tidak ditemukan`;
+    }
+
+    const body: ErrorResponse = {
+      status: 'FAILED',
+      code,
+      message,
+      data: isHttpException ? this.extractData(exception) : null,
+    };
     response.status(code).json(body);
   }
 
@@ -57,5 +67,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     return exception.message;
+  }
+
+  /** Detail error per field, mis. `{ email: 'email sudah terdaftar' }`. */
+  private extractData(exception: HttpException): unknown {
+    const body = exception.getResponse();
+    return typeof body === 'object' && body !== null && 'data' in body
+      ? body.data
+      : null;
   }
 }

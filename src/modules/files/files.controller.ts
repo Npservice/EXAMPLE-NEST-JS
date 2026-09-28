@@ -13,7 +13,7 @@ import type { Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator.js';
 import { FilesService } from './files.service.js';
-import { SignedUrlGuard } from './guards/signed-url.guard.js';
+import { SignedUrlGuard } from '../../common/guards/signed-url.guard.js';
 
 function contentDisposition(filename: string): string {
   const escaped = filename.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -52,7 +52,7 @@ export class FilesController {
     res.send(buffer);
   }
 
-  @ResponseMessage('Upload Success')
+  @ResponseMessage('Upload berhasil')
   @UseInterceptors(FilesInterceptor('files'))
   @Post('store')
   uploadFile(@UploadedFiles() files: Express.Multer.File[]) {

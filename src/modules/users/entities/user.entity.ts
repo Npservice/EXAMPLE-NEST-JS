@@ -1,3 +1,4 @@
+import { Exclude, Expose } from 'class-transformer';
 import {
   Column,
   CreateDateColumn,
@@ -22,6 +23,7 @@ export class User {
   @Column()
   name: string;
 
+  @Exclude()
   @Column({ select: false })
   password: string;
 
@@ -33,12 +35,15 @@ export class User {
   })
   roles: Relation<Role[]>;
 
+  @Expose({ name: 'created_at' })
   @CreateDateColumn()
   createdAt: Date;
 
+  @Expose({ name: 'updated_at' })
   @UpdateDateColumn()
   updatedAt: Date;
 
+  @Exclude()
   @DeleteDateColumn()
   deletedAt: Date | null;
 }

@@ -1,13 +1,13 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, MaxLength, MinLength } from 'class-validator';
 
 export class CreateUserDto {
-  @IsEmail()
+  @IsEmail({}, { message: 'format email tidak valid' })
   email: string;
 
-  @IsString()
+  @IsNotEmpty({ message: 'wajib diisi' })
+  @MaxLength(255, { message: 'maksimal 255 karakter' })
   name: string;
 
-  @IsString()
-  @MinLength(6)
+  @MinLength(6, { message: 'minimal 6 karakter' })
   password: string;
 }

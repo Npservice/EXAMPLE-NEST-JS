@@ -10,7 +10,7 @@ import { map, type Observable } from 'rxjs';
 import { RESPONSE_MESSAGE_KEY } from '../decorators/response-message.decorator.js';
 
 export interface ApiResponse<T> {
-  status: 'success';
+  status: 'OK';
   code: number;
   message: string;
   data: T;
@@ -30,13 +30,13 @@ export class ResponseInterceptor<T>
       this.reflector.getAllAndOverride<string>(RESPONSE_MESSAGE_KEY, [
         context.getHandler(),
         context.getClass(),
-      ]) ?? 'Success';
+      ]) ?? 'Berhasil';
 
     const response = context.switchToHttp().getResponse<Response>();
 
     return next.handle().pipe(
       map((data) => ({
-        status: 'success' as const,
+        status: 'OK' as const,
         code: response.statusCode,
         message,
         data: (data ?? null) as T,

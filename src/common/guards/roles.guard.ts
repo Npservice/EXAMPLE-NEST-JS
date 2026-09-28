@@ -30,7 +30,7 @@ export class RolesGuard implements CanActivate {
     const hasRole = requiredRoles.some((role) => userRoles.includes(role));
 
     if (!hasRole) {
-      throw new ForbiddenException('Insufficient role permissions');
+      throw new ForbiddenException('Anda tidak punya akses');
     }
 
     return true;

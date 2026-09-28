@@ -1,9 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { PageQueryDto } from '../../common/dto/page-query.dto.js';
 import { Permissions } from '../../common/decorators/permissions.decorator.js';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
-import { ListUsersQueryDto } from './dto/list-users-query.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UsersService } from './users.service.js';
 
@@ -13,19 +22,21 @@ export class UsersController {
 
   @Roles('admin')
   @Permissions('users:create')
-  @ResponseMessage('Created data successfully')
+  @ResponseMessage('User berhasil dibuat')
   @Post()
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
 
   @Permissions('users:read')
+  @ResponseMessage('Berhasil ambil data user')
   @Get()
-  findAll(@Query() query: ListUsersQueryDto) {
+  findAll(@Query() query: PageQueryDto) {
     return this.usersService.findAll(query);
   }
 
   @Permissions('users:read')
+  @ResponseMessage('Berhasil ambil data user')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
@@ -33,7 +44,7 @@ export class UsersController {
 
   @Roles('admin')
   @Permissions('users:update')
-  @ResponseMessage('Updated data successfully')
+  @ResponseMessage('User berhasil diperbarui')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);
@@ -41,7 +52,7 @@ export class UsersController {
 
   @Roles('admin')
   @Permissions('users:delete')
-  @ResponseMessage('Deleted data successfully')
+  @ResponseMessage('User berhasil dihapus')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);

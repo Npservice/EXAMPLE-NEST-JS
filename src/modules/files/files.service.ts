@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import {
   Injectable,
@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { generateSignedUrl } from '../../common/utils/signed-url.util.js';
-import { type FileStatus, FileEntity } from './entities/file.entity.js';
+import { FileEntity } from './entities/file.entity.js';
 
 const ALLOWED_EXTENSIONS = new Set([
   '.pdf',
@@ -93,7 +93,7 @@ export class FilesService {
       const ext = extname(file.originalname).toLowerCase();
 
       if (!ALLOWED_EXTENSIONS.has(ext)) {
-        throw new UnsupportedMediaTypeException('unsupported file type');
+        throw new UnsupportedMediaTypeException('Tipe file tidak didukung');
       }
 
       const id = randomUUID();
@@ -144,46 +144,6 @@ export class FilesService {
     return readFile(file.path);
   }
 
-  async deleteFile(id: string) {
-    const file = await this.filesRepository.findOne({ where: { id } });
-
-    if (!file) {
-      return;
-    }
-
-    await rm(file.path, { force: true });
-    await this.filesRepository.delete({ id });
-  }
-
-  async rollbackFile(id: string, status: FileStatus) {
-    return this.moveFile(id, false, status);
-  }
-
-  async moveToStorage(id: string, status: FileStatus) {
-    return this.moveFile(id, true, status);
-  }
-
-  private async moveFile(id: string, toStorage: boolean, status: FileStatus) {
-    const file = await this.filesRepository.findOne({ where: { id } });
-
-    if (!file) {
-      throw new NotFoundException('File tidak ditemukan');
-    }
-
-    const destDir = toStorage ? this.storageDir : this.tempDir;
-    await mkdir(destDir, { recursive: true });
-
-    const ext = extname(file.path);
-    const newPath = join(destDir, `${randomUUID()}${ext}`);
-
-    await rename(file.path, newPath);
-
-    file.path = newPath;
-    file.isTemp = toStorage ? 0 : 1;
-    file.status = status;
-    return this.filesRepository.save(file);
-  }
-
   async generateSignedUrl(id: string): Promise<SignedUrlResult> {
     const file = await this.findById(id);
     return this.buildSignedResult(id, file);
@@ -199,7 +159,7 @@ export class FilesService {
       throw new Error('SIGNED_URL_SECRET belum di-set');
     }
 
-    const fileUrl = `${this.baseUrl.replace(/\/$/, '')}/files/signed/${id}`;
+    const fileUrl = `${this.baseUrl.replace(/\/$/, '')}/api/v1/files/signed/${id}`;
     const url = generateSignedUrl(
       fileUrl,
       SIGNED_URL_TTL_MS,

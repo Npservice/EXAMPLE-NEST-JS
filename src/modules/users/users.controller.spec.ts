@@ -1,4 +1,3 @@
-import { CacheModule } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -20,9 +19,14 @@ describe('UsersController', () => {
     deletedAt: null,
   };
 
+  const mockPage = {
+    content: [mockUser],
+    page: { size: 10, number: 0, total_elements: 1, total_pages: 1 },
+  };
+
   const mockUsersService = {
     create: vi.fn().mockResolvedValue(mockUser),
-    findAll: vi.fn().mockResolvedValue([mockUser]),
+    findAll: vi.fn().mockResolvedValue(mockPage),
     findOne: vi.fn().mockResolvedValue(mockUser),
     update: vi.fn().mockResolvedValue(mockUser),
     remove: vi.fn().mockResolvedValue(undefined),
@@ -30,7 +34,6 @@ describe('UsersController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [CacheModule.register()],
       controllers: [UsersController],
       providers: [{ provide: UsersService, useValue: mockUsersService }],
     }).compile();
@@ -49,9 +52,10 @@ describe('UsersController', () => {
     expect(mockUsersService.create).toHaveBeenCalledWith(dto);
   });
 
-  it('should return all users', async () => {
-    const query = { page: 1, size: 10 };
-    await expect(controller.findAll(query)).resolves.toEqual([mockUser]);
+  it('should return a page of users', async () => {
+    const query = { page: 0, size: 10 };
+    await expect(controller.findAll(query)).resolves.toEqual(mockPage);
+    expect(mockUsersService.findAll).toHaveBeenCalledWith(query);
   });
 
   it('should return a single user', async () => {
